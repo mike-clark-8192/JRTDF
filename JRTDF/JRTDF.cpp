@@ -12,8 +12,9 @@
 
 BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam);
 
+#define YESBUTTONTEXT L"&Yes"
+
 struct ButtonData {
-    std::wstring targetButtonLabel = L"&Yes";
     HWND foundButtonHandle = NULL;
 };
 
@@ -59,12 +60,11 @@ BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam)
     wchar_t className[JRTDFSTRLEN];
     wchar_t windowText[JRTDFSTRLEN];
 
-    GetClassNameW(hwnd, className, JRTDFSTRLEN);
-    GetWindowTextW(hwnd, windowText, JRTDFSTRLEN);
-
-    if (wcscmp(className, L"Button") == 0 && wcscmp(windowText, pData->targetButtonLabel.c_str()) == 0) {
-        pData->foundButtonHandle = hwnd;
-        return FALSE;
+    if (GetClassNameW(hwnd, className, JRTDFSTRLEN) && wcscmp(className, L"Button") == 0) {
+        if (GetWindowTextW(hwnd, windowText, JRTDFSTRLEN) && wcscmp(windowText, YESBUTTONTEXT) == 0) {
+            pData->foundButtonHandle = hwnd;
+            return FALSE;
+        }
     }
 
     return TRUE;
