@@ -86,8 +86,8 @@ jobs:
       - name: Set version
         shell: pwsh
         run: |
-          $COMMA_VERSION = "${{ env.VERSION_MAJOR }},${{ env.VERSION_MINOR }},${{ env.VERSION_PATCH }},${{ env.GITHUB_RUN_NUMBER }}"
-          $DOT_VERSION = "${{ env.VERSION }}.${{ env.GITHUB_RUN_NUMBER }}"
+          $COMMA_VERSION = "${{ env.VERSION_MAJOR }},${{ env.VERSION_MINOR }},${{ env.VERSION_PATCH }},1"
+          $DOT_VERSION = "${{ env.VERSION }}.1"
           $content = Get-Content -Path "JRTDF/JRTDF.rc" -Raw
           $content = $content -replace '1,0,0,1', $COMMA_VERSION
           $content = $content -replace '1.0.0.1', $DOT_VERSION
