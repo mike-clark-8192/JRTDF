@@ -12,6 +12,6 @@ There is a small possibility that Explorer might create such a dialog for an ope
 To be thorough, this program should probably check the message contents of the dialog before clicking the button. This would virtually eliminate the possibility of mistaken dialog identity.
 However, I was willing to accept this small risk for personal use, since I was programming this project within a limited amount of time.
 
-The program relies on the titles and labels that the English-language version of Windows uses. You would have to customize the program to use it on a Windows setup using a non-English display language.
+The program relies on Windows' en-US titles and labels. You would have to customize the program code and recompile the project to use it on a Windows setup using a non-English display language.
 
 PRs are welcome.
