@@ -2,9 +2,7 @@
 #include <string>
 #include <windows.h>
 
-#ifndef UNICODE
-#error UNICODE is not defined
-#endif
+#define JRTDFSTRLEN 64
 
 #ifdef _DEBUG
 #define DEBUG_ 1
@@ -12,92 +10,64 @@
 #undef DEBUG_
 #endif
 
-#define MAXWINSTRLEN 100
+BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam);
 
-void PrintWindowInfo(HWND hwnd)
-{
-    wchar_t windowTitle[MAXWINSTRLEN];
-    wchar_t windowClass[MAXWINSTRLEN];
-    if (GetWindowText(hwnd, windowTitle, MAXWINSTRLEN)) {
-        std::wcout << L"Window title: " << windowTitle;
-    }
-    if (GetClassName(hwnd, windowClass, MAXWINSTRLEN)) {
-        std::wcout << L" class: " << windowClass;
-    }
-    std::wcout << std::endl;
-}
+struct ButtonData {
+    std::wstring targetButtonLabel = L"&Yes";
+    HWND foundButtonHandle = NULL;
+};
 
-bool IsParentRenameDialogRecursivelyUpwards(HWND hwndYesButton)
+void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idObject, LONG idChild, DWORD dwEventThread, DWORD dwmsEventTime)
 {
-    Sleep(10);
-    HWND hwndParent = GetParent(hwndYesButton);
-    if (!hwndParent) {
-        return false;
-    }
-    wchar_t windowTitle[MAXWINSTRLEN];
-    wchar_t windowClass[MAXWINSTRLEN];
-    if (GetWindowText(hwndParent, windowTitle, MAXWINSTRLEN) && GetClassName(hwndParent, windowClass, MAXWINSTRLEN)) {
-        if (wcscmp(windowTitle, L"Rename") == 0 && wcscmp(windowClass, L"#32770") == 0) {
-#ifdef DEBUG_
-            std::wcout << L"Found the 'Rename' dialog." << std::endl;
-#endif
-            return true;
-        }
-    }
-    return IsParentRenameDialogRecursivelyUpwards(hwndParent);
-}
-
-bool IsYesButton(HWND hwnd)
-{
-    wchar_t windowTitle[MAXWINSTRLEN];
-    wchar_t windowClass[MAXWINSTRLEN];
-    if (GetWindowText(hwnd, windowTitle, MAXWINSTRLEN) && GetClassName(hwnd, windowClass, MAXWINSTRLEN)) {
-        if (wcscmp(windowTitle, L"&Yes") == 0 && wcscmp(windowClass, L"Button") == 0) {
-#ifdef DEBUG_
-            std::wcout << L"Found the '&Yes' button." << std::endl;
-#endif
-            return true;
-        }
-    }
-    return false;
-}
-
-void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idObject, LONG idChild, DWORD dwEventThread, DWORD dwmsEventTime) noexcept
-{
-    UNREFERENCED_PARAMETER(dwEventThread);
     UNREFERENCED_PARAMETER(dwmsEventTime);
+    UNREFERENCED_PARAMETER(dwEventThread);
     UNREFERENCED_PARAMETER(idChild);
-    UNREFERENCED_PARAMETER(hook);
     UNREFERENCED_PARAMETER(event);
-    try {
+    UNREFERENCED_PARAMETER(hook);
 
-#ifdef DEBUG_
-        std::wcout << L"hook: " << hook
-                   << L", event: " << event
-                   << L", hwnd: " << hwnd
-                   << L", idObject: " << idObject
-                   << L", idChild: " << idChild
-                   << L", dwEventThread: " << dwEventThread
-                   << L", dwmsEventTime: " << dwmsEventTime
-                   << std::endl;
-        PrintWindowInfo(hwnd);
-#endif
+    if (idObject != OBJID_WINDOW)
+        return;
 
-        if (idObject != OBJID_WINDOW)
-            return;
-        Sleep(10);
-        if (IsYesButton(hwnd)) {
-            Sleep(10);
-            if (IsParentRenameDialogRecursivelyUpwards(hwnd)) {
+    wchar_t windowClass[JRTDFSTRLEN];
+    wchar_t windowTitle[JRTDFSTRLEN];
+    if (GetClassNameW(hwnd, windowClass, JRTDFSTRLEN) && wcscmp(windowClass, L"#32770") == 0) {
 #ifdef DEBUG_
-                std::wcout << L"Found the 'Yes' button in the 'Rename' dialog." << std::endl;
+        std::wcout << L"Found a dialog window." << std::endl;
 #endif
-                SendMessage(hwnd, BM_CLICK, 0, 0);
+        if (GetWindowTextW(hwnd, windowTitle, JRTDFSTRLEN)) {
+#ifdef DEBUG_
+            std::wcout << L"Window title: " << windowTitle << std::endl;
+#endif
+            if (wcscmp(windowTitle, L"Rename") == 0) {
+                ButtonData data;
+                EnumChildWindows(hwnd, EnumChildProc, (LPARAM)&data);
+
+                if (data.foundButtonHandle) {
+#ifdef DEBUG_
+                    std::wcout << L"Found the '&Yes' button, sending click message." << std::endl;
+#endif
+                    SendMessage(data.foundButtonHandle, BM_CLICK, 0, 0);
+                }
             }
         }
-    } catch (...) {
-        std::wcerr << L"Exception caught in WinEventProc." << std::endl;
     }
+}
+
+BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam)
+{
+    ButtonData* pData = (ButtonData*)lParam;
+    wchar_t className[JRTDFSTRLEN];
+    wchar_t windowText[JRTDFSTRLEN];
+
+    GetClassNameW(hwnd, className, JRTDFSTRLEN);
+    GetWindowTextW(hwnd, windowText, JRTDFSTRLEN);
+
+    if (wcscmp(className, L"Button") == 0 && wcscmp(windowText, pData->targetButtonLabel.c_str()) == 0) {
+        pData->foundButtonHandle = hwnd;
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 int main()
@@ -105,16 +75,16 @@ int main()
     DWORD explorerPID = 0;
     HWND explorerHWND = FindWindow(L"Progman", L"Program Manager");
     if (explorerHWND) {
-        GetWindowThreadProcessId(explorerHWND, &explorerPID); // Get the process ID
-    } else {
-        std::wcerr << L"Explorer.exe not found." << std::endl;
+        GetWindowThreadProcessId(explorerHWND, &explorerPID);
+    }
+
+    if (explorerPID == 0) {
+        std::wcerr << L"explorer.exe not found." << std::endl;
         return 1;
     }
 
     HWINEVENTHOOK hook = SetWinEventHook(
-        EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE,
-        //EVENT_SYSTEM_DIALOGSTART, EVENT_SYSTEM_DIALOGSTART,
-        //EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW,
+        EVENT_SYSTEM_DIALOGSTART, EVENT_SYSTEM_DIALOGSTART,
         NULL,
         WinEventProc,
         explorerPID, 0,
@@ -125,7 +95,7 @@ int main()
         return 1;
     }
 
-    std::wcout << L"Hook set. Monitoring window creation events in explorer.exe..." << std::endl;
+    std::wcout << L"Hooked EVENT_SYSTEM_DIALOGSTART in explorer.exe..." << std::endl;
 
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
