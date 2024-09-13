@@ -103,7 +103,7 @@ jobs:
         shell: pwsh
         run: |
           MSBuild JRTDF.sln /p:Configuration=Release /p:Platform=x64
-          echo "RELEASE_ARCH_ZIP=$REPO_NAME-$VERSION-x64.zip" >> $env:GITHUB_ENV
+          echo "RELEASE_ARCH_ZIP=$env:REPO_NAME-$env:VERSION-x64.zip" >> $env:GITHUB_ENV
 
       - name: Create release zip
         run: >
