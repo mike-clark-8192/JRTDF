@@ -11,9 +11,9 @@
 #define YESBUTTONTEXT L"&Yes"
 
 #ifdef _DEBUG
-#define DEBUG_ 1
+#define DEBUG_PRINT(x) std::wcout << x << std::endl
 #else
-#undef DEBUG_
+#define DEBUG_PRINT(x)
 #endif
 
 struct ButtonData {
@@ -81,25 +81,20 @@ void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idOb
         return;
 
     wchar_t windowClass[JRTDFSTRLEN];
-    wchar_t windowTitle[JRTDFSTRLEN];
-    if (GetClassNameW(hwnd, windowClass, JRTDFSTRLEN) && wcscmp(windowClass, L"#32770") == 0) {
-#ifdef DEBUG_
-        std::wcout << L"Found a dialog window." << std::endl;
-#endif
+    if (GetClassNameW(hwnd, windowClass, JRTDFSTRLEN) && wcscmp(windowClass, L"#32770") == 0)
+    {
+        wchar_t windowTitle[JRTDFSTRLEN];
+        DEBUG_PRINT(L"Found a dialog window.");
         if (GetWindowTextW(hwnd, windowTitle, JRTDFSTRLEN)) {
-#ifdef DEBUG_
-            std::wcout << L"Window title: " << windowTitle << std::endl;
-#endif
+            DEBUG_PRINT(L"Window title: " << windowTitle);
             if (wcscmp(windowTitle, DIALOG_TITLE) == 0) {
                 ButtonData data;
-                EnumChildWindows(hwnd, EnumChildProc, (LPARAM)&data);
+                EnumChildWindows(hwnd, EnumChildProc, reinterpret_cast<LPARAM>(&data));
 
                 if (data.foundButtonHandle) {
-#ifdef DEBUG_
-                    std::wcout << L"Found the '&Yes' button" << std::endl;
-#endif
+                    DEBUG_PRINT(L"Found the '&Yes' button");
                     std::wstring dialogContent = GetTextFromControl(hwnd);
-                    std::wcout << L"Dialog content: " << dialogContent << std::endl;
+                    DEBUG_PRINT(L"Dialog content: " << dialogContent);
                     SendMessage(data.foundButtonHandle, BM_CLICK, 0, 0);
                 }
             }
@@ -109,11 +104,12 @@ void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idOb
 
 BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam)
 {
-    ButtonData* pData = (ButtonData*)lParam;
+    ButtonData* pData = reinterpret_cast<ButtonData*>(lParam);
     wchar_t className[JRTDFSTRLEN];
-    wchar_t windowText[JRTDFSTRLEN];
 
-    if (GetClassNameW(hwnd, className, JRTDFSTRLEN) && wcscmp(className, L"Button") == 0) {
+    if (GetClassNameW(hwnd, className, JRTDFSTRLEN) && wcscmp(className, L"Button") == 0)
+    {
+        wchar_t windowText[JRTDFSTRLEN];
         if (GetWindowTextW(hwnd, windowText, JRTDFSTRLEN) && wcscmp(windowText, YESBUTTONTEXT) == 0) {
             pData->foundButtonHandle = hwnd;
             return FALSE;
@@ -132,7 +128,7 @@ BOOL InitializeUIAutomation()
         return FALSE;
     }
 
-    hr = CoCreateInstance(CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER, IID_IUIAutomation, (void**)&pAutomation);
+    hr = CoCreateInstance(CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER, IID_IUIAutomation, reinterpret_cast<void**>(&pAutomation));
     if (FAILED(hr)) {
         std::wcerr << L"Failed to create UI Automation instance." << std::endl;
         CoUninitialize();
