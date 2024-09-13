@@ -28,8 +28,7 @@ std::wstring GetTextFromControl(HWND hwnd);
 void CALLBACK WinEventProc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idObject, LONG idChild, DWORD dwEventThread, DWORD dwmsEventTime);
 BOOL InitializeUIAutomation();
 
-int main()
-{
+int JRTDF() {
     if (!InitializeUIAutomation()) {
         return 1;
     }
@@ -204,3 +203,15 @@ bool FindFirstTextElement(IUIAutomationElement* pElement, IUIAutomationElement**
     pControlWalker->Release();
     return false;
 }
+
+#ifdef _CONSOLE
+int main(int /*argc*/, char** /*argv*/)
+{
+    return JRTDF();
+}
+#else
+int WINAPI WinMain(_In_ HINSTANCE /*hInstance*/, _In_opt_ HINSTANCE /*hPrevInstance*/, _In_ LPSTR /*lpCmdLine*/, _In_ int /*nCmdShow*/)
+{
+    return JRTDF();
+}
+#endif

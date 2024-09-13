@@ -10,4 +10,6 @@ Inspired by [this post](https://superuser.com/questions/67449/turn-off-change-fi
 The program relies on Windows' en-US localized title, button label, and message for this dialog.
 You would have to customize the program code and recompile the project to use it on a Windows setup using a non-English display language.
 
+The program has no user interface. To exit the program, kill the `JRTDF.exe` process from Task Manager.
+
 PRs are welcome.
