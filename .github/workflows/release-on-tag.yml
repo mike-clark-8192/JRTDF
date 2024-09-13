@@ -1,0 +1,125 @@
+name: release-on-tag.yml
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]-*'
+env:
+  # Pre-declare variables defined by step id: build-vars
+  REPO_OWNER: ''
+  REPO_NAME: ''
+  VERSION: ''
+  PRERELEASE: ''
+  HAS_PRERELEASE: ''
+  RELEASE_ZIP: ''
+  VERSION_MAJOR: ''
+  VERSION_MINOR: ''
+  VERSION_PATCH: ''
+  RELEASE_ARCH_ZIP: ''
+
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Define build variables
+        id: build-vars
+        shell: pwsh
+        run: |
+          #######################################################
+          # REPO_OWNER and REPO_NAME
+          #######################################################
+          echo "GITHUB_REPOSITORY: $env:GITHUB_REPOSITORY"
+          $REPO_PATTERN = '^(.*)/(.*)$'
+          if ($env:GITHUB_REPOSITORY -match $REPO_PATTERN) {
+            $REPO_OWNER = $matches[1]
+            $REPO_NAME = $matches[2]
+          } else {
+            throw "Unsupported repository format: $env:GITHUB_REPOSITORY"
+          }
+          echo "REPO_OWNER=$REPO_OWNER" >> $env:GITHUB_ENV
+          echo "REPO_NAME=$REPO_NAME" >> $env:GITHUB_ENV
+
+          #######################################################
+          # VERSION, PRERELEASE, HAS_PRERELEASE
+          #######################################################
+          echo "GITHUB_REF_NAME: $env:GITHUB_REF_NAME"
+          $VERSION_PATTERN = '^v?(\d+\.\d+\.\d+)(?:-(.*))?$'
+          if ($env:GITHUB_REF_NAME -match $VERSION_PATTERN) {
+            $VERSION = $matches[1]
+            $PRERELEASE = $matches[2]
+            $HAS_PRERELEASE = $PRERELEASE ? "true" : "false"
+          } else {
+            throw "Unsupported version format: $env:GITHUB_REF_NAME"
+          }
+          # extract VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH
+          $VERSION_PATTERN = '^(\d+)\.(\d+)\.(\d+)$'
+          if ($VERSION -match $VERSION_PATTERN) {
+            $VERSION_MAJOR = $matches[1]
+            $VERSION_MINOR = $matches[2]
+            $VERSION_PATCH = $matches[3]
+          } else {
+            throw "Unsupported version format: $VERSION"
+          }
+          echo "VERSION=$VERSION" >> $env:GITHUB_ENV
+          echo "VERSION_MAJOR=$VERSION_MAJOR" >> $env:GITHUB_ENV
+          echo "VERSION_MINOR=$VERSION_MINOR" >> $env:GITHUB_ENV
+          echo "VERSION_PATCH=$VERSION_PATCH" >> $env:GITHUB_ENV
+          echo "PRERELEASE=$PRERELEASE" >> $env:GITHUB_ENV
+          echo "HAS_PRERELEASE=$HAS_PRERELEASE" >> $env:GITHUB_ENV
+
+          # RELEASE_ZIP
+          $RELEASE_ZIP = "$REPO_NAME-$VERSION.zip"
+          echo "RELEASE_ZIP=$RELEASE_ZIP" >> $env:GITHUB_ENV
+
+          #######################################################
+          # Display newly defined variables
+          #######################################################
+          Get-Content $env:GITHUB_ENV
+
+      - name: Set version
+        shell: pwsh
+        run: |
+          $COMMA_VERSION = "${{ env.VERSION_MAJOR }},${{ env.VERSION_MINOR }},${{ env.VERSION_PATCH }},${{ env.GITHUB_RUN_NUMBER }}"
+          $DOT_VERSION = "${{ env.VERSION }}.${{ env.GITHUB_RUN_NUMBER }}"
+          $content = Get-Content -Path "JRTDF/JRTDF.rc" -Raw
+          $content = $content -replace '1,0,0,1', $COMMA_VERSION
+          $content = $content -replace '1.0.0.1', $DOT_VERSION
+          Set-Content -Path "JRTDF/JRTDF.rc" -Value $content
+          cat JRTDF/JRTDF.rc
+
+      - name: Add msbuild to PATH
+          uses: microsoft/setup-msbuild@v2
+          with:
+            msbuild-architecture: x64
+
+      - name: Build
+        shell: pwsh
+        run: |
+          MSBuild JRTDF.sln /p:Configuration=Release /p:Platform=x64
+          echo "RELEASE_ARCH_ZIP=$REPO_NAME-$VERSION-x64.zip" >> $env:GITHUB_ENV
+
+      - name: Create release zip
+        run: >
+          Compress-Archive -Force -CompressionLevel Optimal
+          -Path 
+          x64\Release\*.exe,
+          README.md
+          -DestinationPath $env:RELEASE_ARCH_ZIP
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.RELEASE_ARCH_ZIP }}
+          tag_name: ${{ github.ref_name }}
+          body: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ env.HAS_PRERELEASE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
