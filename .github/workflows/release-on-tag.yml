@@ -109,7 +109,7 @@ jobs:
         run: >
           Compress-Archive -Force -CompressionLevel Optimal
           -Path 
-          x64\Release\*.exe,
+          x64\ReleaseNoConsole\*.exe,
           README.md
           -DestinationPath $env:RELEASE_ARCH_ZIP
 
@@ -119,7 +119,7 @@ jobs:
           files: ${{ env.RELEASE_ARCH_ZIP }}
           tag_name: ${{ github.ref_name }}
           body: ${{ github.ref_name }}
-          draft: false
+          draft: true
           prerelease: ${{ env.HAS_PRERELEASE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
